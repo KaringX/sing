@@ -5,6 +5,7 @@ import (
 )
 
 const prefixLabel = '\r'
+const dotLabel = '.' //karing
 
 // mod from https://github.com/openacid/succinct
 
@@ -52,7 +53,9 @@ func (ss *succinctSet) Has(key string) bool {
 			}
 			nextLabel := ss.labels[bmIdx-nodeId]
 			if nextLabel == prefixLabel {
-				return true
+				if currentChar == dotLabel { //karing
+					return true
+				}
 			}
 			if nextLabel == currentChar {
 				break
