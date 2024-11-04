@@ -14,6 +14,7 @@ import (
 var _ Manager = (*defaultManager)(nil)
 
 type defaultManager struct {
+	workPath string //karing
 	basePath string
 	tempPath string
 	chown    bool
@@ -21,7 +22,7 @@ type defaultManager struct {
 	groupID  int
 }
 
-func WithDefault(ctx context.Context, basePath string, tempPath string, userID int, groupID int) context.Context {
+func WithDefault(ctx context.Context, workPath string, basePath string, tempPath string, userID int, groupID int) context.Context {//karing
 	chown := userID != os.Getuid() || groupID != os.Getgid()
 	if tempPath == "" {
 		tempPath = os.TempDir()
@@ -34,6 +35,14 @@ func WithDefault(ctx context.Context, basePath string, tempPath string, userID i
 		groupID:  groupID,
 	})
 }
+
+func (m *defaultManager) WorkPath(name string) string { //karing
+	if m.workPath == "" || strings.HasPrefix(name, "/") {
+		return name
+	}
+	return filepath.Join(m.workPath, name)
+}
+
 
 func (m *defaultManager) BasePath(name string) string {
 	if m.basePath == "" || strings.HasPrefix(name, "/") {
