@@ -37,7 +37,7 @@ func WithDefault(ctx context.Context, workPath string, basePath string, tempPath
 	})
 }
 
-func (m *defaultManager) WorkPath(name string) string {  //karing
+func (m *defaultManager) WorkPath(name string) string { //karing
 	if m.workPath == "" || strings.HasPrefix(name, "/") {
 		return name
 	}
