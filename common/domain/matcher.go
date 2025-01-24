@@ -145,3 +145,18 @@ func reverseDomain(domain string) string {
 	}
 	return string(b)
 }
+<<<<<<< HEAD
+=======
+
+func reverseDomainSuffix(domain string) string {
+	l := len(domain)
+	b := make([]byte, l+1)
+	for i := 0; i < l; {
+		r, n := utf8.DecodeRuneInString(domain[i:])
+		i += n
+		utf8.EncodeRune(b[l-i:], r)
+	}
+	b[l] = prefixLabel
+	return string(b)
+}
+>>>>>>> karing_v0.4.3
