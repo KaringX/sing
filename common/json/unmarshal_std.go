@@ -11,3 +11,9 @@ func UnmarshalDisallowUnknownFields(content []byte, value any) error {
 	decoder.DisallowUnknownFields()
 	return decoder.Decode(value)
 }
+
+func UnmarshalAllowUnknownFields(content []byte, value any) error { //karing
+	decoder := NewDecoder(bytes.NewReader(content))
+	return decoder.Decode(value)
+}
+
