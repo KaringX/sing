@@ -6,6 +6,9 @@ type causeError struct {
 }
 
 func (e *causeError) Error() string {
+	if e.cause == nil { //karing
+		return e.message
+	}
 	return e.message + ": " + e.cause.Error()
 }
 
