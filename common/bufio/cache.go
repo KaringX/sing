@@ -170,8 +170,10 @@ func (c *CachedPacketConn) ReadPacket(buffer *buf.Buffer) (destination M.Socksad
 		if err != nil {
 			return M.Socksaddr{}, err
 		}
-		c.buffer.DecRef()
-		c.buffer.Release()
+		if buffer := c.buffer; buffer != nil { //karing
+			buffer.DecRef()
+			buffer.Release()
+		}
 		c.buffer = nil
 		return c.destination, nil
 	}
