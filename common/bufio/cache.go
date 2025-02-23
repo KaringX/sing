@@ -37,8 +37,10 @@ func (c *CachedConn) Read(p []byte) (n int, err error) {
 		if err == nil {
 			return
 		}
-		c.buffer.DecRef()
-		c.buffer.Release()
+		if buffer := c.buffer; buffer != nil { //karing
+			buffer.DecRef()
+			buffer.Release()
+		}
 		c.buffer = nil
 	}
 	return c.Conn.Read(p)
