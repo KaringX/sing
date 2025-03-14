@@ -101,10 +101,11 @@ func (ss *succinctSet) Write(writer varbin.Writer) error {
 }
 
 func setBit(bm *[]uint64, i int, v int) {
-	for i>>6 >= len(*bm) {
+	index := i >> 6         //karing
+	for index >= len(*bm) { //karing
 		*bm = append(*bm, 0)
 	}
-	(*bm)[i>>6] |= uint64(v) << uint(i&63)
+	(*bm)[index] |= uint64(v) << uint(i&63) //karing
 }
 
 func getBit(bm []uint64, i int) uint64 {

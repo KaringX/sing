@@ -22,12 +22,12 @@ func (l *Listable[T]) UnmarshalJSONContext(ctx context.Context, content []byte) 
 		return nil
 	}
 	var singleItem T
-	err := json.UnmarshalContextDisallowUnknownFields(ctx, content, &singleItem)
+	err := json.UnmarshalContextAllowUnknownFields(ctx, content, &singleItem) //karing
 	if err == nil {
 		*l = []T{singleItem}
 		return nil
 	}
-	newErr := json.UnmarshalContextDisallowUnknownFields(ctx, content, (*[]T)(l))
+	newErr := json.UnmarshalContextAllowUnknownFields(ctx, content, (*[]T)(l))  //karing
 	if newErr == nil {
 		return nil
 	}

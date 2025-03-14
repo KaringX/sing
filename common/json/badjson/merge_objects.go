@@ -53,7 +53,7 @@ func UnmarshallExcludedContext(ctx context.Context, inputContent []byte, parentO
 	if err != nil {
 		return err
 	}
-	return json.UnmarshalContextDisallowUnknownFields(ctx, inputContent, object)
+	return json.UnmarshalContextAllowUnknownFields(ctx, inputContent, object) //karing
 }
 
 func newJSONObject(ctx context.Context, object any) (*JSONObject, error) {
