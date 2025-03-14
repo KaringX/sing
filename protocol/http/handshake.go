@@ -4,6 +4,7 @@ import (
 	std_bufio "bufio"
 	"context"
 	"encoding/base64"
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -20,15 +21,20 @@ import (
 	"github.com/sagernet/sing/common/pipe"
 )
 
-type Handler = N.TCPConnectionHandler
-
-func HandleConnection(ctx context.Context, conn net.Conn, reader *std_bufio.Reader, authenticator *auth.Authenticator, handler Handler, metadata M.Metadata) error {
+func HandleConnectionEx(
+	ctx context.Context,
+	conn net.Conn,
+	reader *std_bufio.Reader,
+	authenticator *auth.Authenticator,
+	handler N.TCPConnectionHandlerEx,
+	source M.Socksaddr,
+	onClose N.CloseHandlerFunc,
+) error {
 	for {
 		request, err := ReadRequest(reader)
 		if err != nil {
 			return E.Cause(err, "read http request")
 		}
-
 		if authenticator != nil {
 			var (
 				username string
@@ -68,22 +74,23 @@ func HandleConnection(ctx context.Context, conn net.Conn, reader *std_bufio.Read
 		}
 
 		if sourceAddress := SourceAddress(request); sourceAddress.IsValid() {
-			metadata.Source = sourceAddress
+			source = sourceAddress
 		}
 
 		if request.Method == "CONNECT" {
-			portStr := request.URL.Port()
-			if portStr == "" {
-				portStr = "80"
+			destination := M.ParseSocksaddrHostPortStr(request.URL.Hostname(), request.URL.Port())
+			if destination.Port == 0 {
+				switch request.URL.Scheme {
+				case "https", "wss":
+					destination.Port = 443
+				default:
+					destination.Port = 80
+				}
 			}
-			destination := M.ParseSocksaddrHostPortStr(request.URL.Hostname(), portStr)
 			_, err = conn.Write([]byte(F.ToString("HTTP/", request.ProtoMajor, ".", request.ProtoMinor, " 200 Connection established\r\n\r\n")))
 			if err != nil {
 				return E.Cause(err, "write http response")
 			}
-			metadata.Protocol = "http"
-			metadata.Destination = destination
-
 			var requestConn net.Conn
 			if reader.Buffered() > 0 {
 				buffer := buf.NewSize(reader.Buffered())
@@ -95,75 +102,115 @@ func HandleConnection(ctx context.Context, conn net.Conn, reader *std_bufio.Read
 			} else {
 				requestConn = conn
 			}
-			return handler.NewConnection(ctx, requestConn, metadata)
-		}
-
-		keepAlive := !(request.ProtoMajor == 1 && request.ProtoMinor == 0) && strings.TrimSpace(strings.ToLower(request.Header.Get("Proxy-Connection"))) == "keep-alive"
-		request.RequestURI = ""
-
-		removeHopByHopHeaders(request.Header)
-		removeExtraHTTPHostPort(request)
-
-		if hostStr := request.Header.Get("Host"); hostStr != "" {
-			if hostStr != request.URL.Host {
-				request.Host = hostStr
+			handler.NewConnectionEx(ctx, requestConn, source, destination, onClose)
+			return nil
+		} else if strings.ToLower(request.Header.Get("Connection")) == "upgrade" {
+			destination := M.ParseSocksaddrHostPortStr(request.URL.Hostname(), request.URL.Port())
+			if destination.Port == 0 {
+				switch request.URL.Scheme {
+				case "https", "wss":
+					destination.Port = 443
+				default:
+					destination.Port = 80
+				}
+			}
+			serverConn, clientConn := pipe.Pipe()
+			go func() {
+				handler.NewConnectionEx(ctx, clientConn, source, destination, func(it error) {
+					if it != nil {
+						common.Close(serverConn, clientConn)
+					}
+				})
+			}()
+			err = request.Write(serverConn)
+			if err != nil {
+				return E.Cause(err, "http: write upgrade request")
+			}
+			if reader.Buffered() > 0 {
+				_, err = io.CopyN(serverConn, reader, int64(reader.Buffered()))
+				if err != nil {
+					return err
+				}
+			}
+			return bufio.CopyConn(ctx, conn, serverConn)
+		} else {
+			err = handleHTTPConnection(ctx, handler, conn, request, source)
+			if err != nil {
+				return err
 			}
 		}
+	}
+}
 
-		if request.URL.Scheme == "" || request.URL.Host == "" {
-			return responseWith(request, http.StatusBadRequest).Write(conn)
-		}
+func handleHTTPConnection(
+	ctx context.Context,
+	handler N.TCPConnectionHandlerEx,
+	conn net.Conn,
+	request *http.Request, source M.Socksaddr,
+) error {
+	keepAlive := !(request.ProtoMajor == 1 && request.ProtoMinor == 0) && strings.TrimSpace(strings.ToLower(request.Header.Get("Proxy-Connection"))) == "keep-alive"
+	request.RequestURI = ""
 
-		var innerErr atomic.TypedValue[error]
-		httpClient := &http.Client{
-			Transport: &http.Transport{
-				DisableCompression: true,
-				DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
-					metadata.Destination = M.ParseSocksaddr(address)
-					metadata.Protocol = "http"
-					input, output := pipe.Pipe()
-					go func() {
-						hErr := handler.NewConnection(ctx, output, metadata)
-						if hErr != nil {
-							innerErr.Store(hErr)
-							common.Close(input, output)
-						}
-					}()
-					return input, nil
-				},
-			},
-			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				return http.ErrUseLastResponse
-			},
-		}
-		requestCtx, cancel := context.WithCancel(ctx)
-		response, err := httpClient.Do(request.WithContext(requestCtx))
-		if err != nil {
-			cancel()
-			return E.Errors(innerErr.Load(), err, responseWith(request, http.StatusBadGateway).Write(conn))
-		}
+	removeHopByHopHeaders(request.Header)
+	removeExtraHTTPHostPort(request)
 
-		removeHopByHopHeaders(response.Header)
-
-		if keepAlive {
-			response.Header.Set("Proxy-Connection", "keep-alive")
-			response.Header.Set("Connection", "keep-alive")
-			response.Header.Set("Keep-Alive", "timeout=4")
-		}
-
-		response.Close = !keepAlive
-
-		err = response.Write(conn)
-		if err != nil {
-			cancel()
-			return E.Errors(innerErr.Load(), err)
-		}
-
-		cancel()
-		if !keepAlive {
-			return conn.Close()
+	if hostStr := request.Header.Get("Host"); hostStr != "" {
+		if hostStr != request.URL.Host {
+			request.Host = hostStr
 		}
 	}
+
+	if request.URL.Scheme == "" || request.URL.Host == "" {
+		return responseWith(request, http.StatusBadRequest).Write(conn)
+	}
+
+	var innerErr atomic.TypedValue[error]
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			DisableCompression: true,
+			DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+				input, output := pipe.Pipe()
+				go handler.NewConnectionEx(ctx, output, source, M.ParseSocksaddr(address), func(it error) {
+					innerErr.Store(it)
+					common.Close(input, output)
+				})
+				return input, nil
+			},
+		},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	defer httpClient.CloseIdleConnections()
+
+	requestCtx, cancel := context.WithCancel(ctx)
+	response, err := httpClient.Do(request.WithContext(requestCtx))
+	if err != nil {
+		cancel()
+		return E.Errors(innerErr.Load(), err, responseWith(request, http.StatusBadGateway).Write(conn))
+	}
+
+	removeHopByHopHeaders(response.Header)
+
+	if keepAlive {
+		response.Header.Set("Proxy-Connection", "keep-alive")
+		response.Header.Set("Connection", "keep-alive")
+		response.Header.Set("Keep-Alive", "timeout=4")
+	}
+
+	response.Close = !keepAlive
+
+	err = response.Write(conn)
+	if err != nil {
+		cancel()
+		return E.Errors(innerErr.Load(), err)
+	}
+
+	cancel()
+	if !keepAlive {
+		return conn.Close()
+	}
+	return nil
 }
 
 func removeHopByHopHeaders(header http.Header) {

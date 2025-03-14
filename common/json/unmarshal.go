@@ -2,6 +2,8 @@ package json
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"strings"
 
 	"github.com/sagernet/sing/common"
@@ -9,13 +11,18 @@ import (
 )
 
 func UnmarshalExtended[T any](content []byte) (T, error) {
-	decoder := NewDecoder(NewCommentFilter(bytes.NewReader(content)))
+	return UnmarshalExtendedContext[T](context.Background(), content)
+}
+
+func UnmarshalExtendedContext[T any](ctx context.Context, content []byte) (T, error) {
+	decoder := NewDecoderContext(ctx, NewCommentFilter(bytes.NewReader(content)))
 	var value T
 	err := decoder.Decode(&value)
 	if err == nil {
 		return value, err
 	}
-	if syntaxError, isSyntaxError := err.(*SyntaxError); isSyntaxError {
+	var syntaxError *SyntaxError
+	if errors.As(err, &syntaxError) {
 		prefix := string(content[:syntaxError.Offset])
 		row := strings.Count(prefix, "\n") + 1
 		column := len(prefix) - strings.LastIndex(prefix, "\n") - 1

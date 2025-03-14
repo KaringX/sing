@@ -1,10 +1,11 @@
 package domain
 
 import (
+	"encoding/binary"
 	"math/bits"
-)
 
-const prefixLabel = '\r'
+	"github.com/sagernet/sing/common/varbin"
+)
 
 // mod from https://github.com/openacid/succinct
 
@@ -42,36 +43,61 @@ func newSuccinctSet(keys []string) *succinctSet {
 	return ss
 }
 
-func (ss *succinctSet) Has(key string) bool {
-	var nodeId, bmIdx int
-	for i := 0; i < len(key); i++ {
-		currentChar := key[i]
+func (ss *succinctSet) keys() []string {
+	var result []string
+	var currentKey []byte
+	var bmIdx, nodeId int
+
+	var traverse func(int, int)
+	traverse = func(nodeId, bmIdx int) {
+		if getBit(ss.leaves, nodeId) != 0 {
+			result = append(result, string(currentKey))
+		}
+
 		for ; ; bmIdx++ {
 			if getBit(ss.labelBitmap, bmIdx) != 0 {
-				return false
+				return
 			}
 			nextLabel := ss.labels[bmIdx-nodeId]
-			if nextLabel == prefixLabel {
-				return true
-			}
-			if nextLabel == currentChar {
-				break
-			}
-		}
-		nodeId = countZeros(ss.labelBitmap, ss.ranks, bmIdx+1)
-		bmIdx = selectIthOne(ss.labelBitmap, ss.ranks, ss.selects, nodeId-1) + 1
-	}
-	if getBit(ss.leaves, nodeId) != 0 {
-		return true
-	}
-	for ; ; bmIdx++ {
-		if getBit(ss.labelBitmap, bmIdx) != 0 {
-			return false
-		}
-		if ss.labels[bmIdx-nodeId] == prefixLabel {
-			return true
+			currentKey = append(currentKey, nextLabel)
+			nextNodeId := countZeros(ss.labelBitmap, ss.ranks, bmIdx+1)
+			nextBmIdx := selectIthOne(ss.labelBitmap, ss.ranks, ss.selects, nextNodeId-1) + 1
+			traverse(nextNodeId, nextBmIdx)
+			currentKey = currentKey[:len(currentKey)-1]
 		}
 	}
+
+	traverse(nodeId, bmIdx)
+	return result
+}
+
+type succinctSetData struct {
+	Reserved    uint8
+	Leaves      []uint64
+	LabelBitmap []uint64
+	Labels      []byte
+}
+
+func readSuccinctSet(reader varbin.Reader) (*succinctSet, error) {
+	matcher, err := varbin.ReadValue[succinctSetData](reader, binary.BigEndian)
+	if err != nil {
+		return nil, err
+	}
+	set := &succinctSet{
+		leaves:      matcher.Leaves,
+		labelBitmap: matcher.LabelBitmap,
+		labels:      matcher.Labels,
+	}
+	set.init()
+	return set, nil
+}
+
+func (ss *succinctSet) Write(writer varbin.Writer) error {
+	return varbin.Write(writer, binary.BigEndian, succinctSetData{
+		Leaves:      ss.leaves,
+		LabelBitmap: ss.labelBitmap,
+		Labels:      ss.labels,
+	})
 }
 
 func setBit(bm *[]uint64, i int, v int) {
