@@ -8,6 +8,7 @@ import (
 )
 
 type Manager interface {
+	WorkPath(name string) string //karing
 	BasePath(name string) string
 	OpenFile(name string, flag int, perm os.FileMode) (*os.File, error)
 	Create(name string) (*os.File, error)
@@ -17,6 +18,14 @@ type Manager interface {
 	MkdirAll(path string, perm os.FileMode) error
 	Remove(path string) error
 	RemoveAll(path string) error
+}
+
+func WorkPath(ctx context.Context, name string) string { //karing
+	manager := service.FromContext[Manager](ctx)
+	if manager == nil {
+		return name
+	}
+	return manager.WorkPath(name)
 }
 
 func BasePath(ctx context.Context, name string) string {
