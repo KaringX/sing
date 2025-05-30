@@ -100,3 +100,11 @@ func UnRegisterAll(ctx context.Context) { //karing
 	}
 	registry.UnRegisterAll()
 }
+
+func Clone(ctx context.Context) context.Context { //karing
+	registry := RegistryFromContext(ctx)
+	if registry == nil {
+		panic("missing service registry in context")
+	}
+	return context.WithValue(context.Background(), common.DefaultValue[*Registry](), registry)
+}

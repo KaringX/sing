@@ -49,3 +49,15 @@ func (r *defaultRegistry) UnRegisterAll() { //karing
 		delete(r.serviceTypes, k)
 	}
 }
+
+func (r *defaultRegistry) Clone() Registry { //karing
+	registry := &defaultRegistry{
+		serviceTypes: make(map[any]any),
+	}
+	r.access.Lock()
+	defer r.access.Unlock()
+	for k, v := range r.serviceTypes {
+		registry.serviceTypes[k] = v
+	}
+	return registry
+}
