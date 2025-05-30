@@ -106,5 +106,5 @@ func Clone(ctx context.Context) context.Context { //karing
 	if registry == nil {
 		panic("missing service registry in context")
 	}
-	return context.WithValue(context.Background(), common.DefaultValue[*Registry](), registry)
+	return context.WithValue(context.Background(), common.DefaultValue[*Registry](), registry.Clone())
 }

@@ -9,6 +9,7 @@ type Registry interface {
 	Get(serviceType any) any
 	UnRegister(serviceType any) //karing
 	UnRegisterAll()             //karing
+	Clone() Registry            //karing
 }
 
 func NewRegistry() Registry {
