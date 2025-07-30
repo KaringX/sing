@@ -11,62 +11,42 @@ import (
 
 type syscallVectorisedWriterFields struct {
 	access    sync.Mutex
-	iovecList *[]windows.WSABuf
+	iovecList []windows.WSABuf
 }
 
 func (w *SyscallVectorisedWriter) WriteVectorised(buffers []*buf.Buffer) error {
-	w.access.Lock()
+	/*w.access.Lock()
 	defer w.access.Unlock()
 	defer buf.ReleaseMulti(buffers)
-	var iovecList []windows.WSABuf
-	if w.iovecList != nil {
-		iovecList = *w.iovecList
-	}
-	iovecList = iovecList[:0]
+	iovecList := w.iovecList
 	for _, buffer := range buffers {
-		iovecList = append(iovecList, windows.WSABuf{
-			Buf: &buffer.Bytes()[0],
-			Len: uint32(buffer.Len()),
-		})
+		iovecList = append(iovecList, buffer.Iovec(buffer.Len()))
 	}
-	if w.iovecList == nil {
-		w.iovecList = new([]windows.WSABuf)
-	}
-	*w.iovecList = iovecList // cache
 	var n uint32
 	var innerErr error
 	err := w.rawConn.Write(func(fd uintptr) (done bool) {
 		innerErr = windows.WSASend(windows.Handle(fd), &iovecList[0], uint32(len(iovecList)), &n, 0, nil, nil)
 		return innerErr != windows.WSAEWOULDBLOCK
 	})
+	common.ClearArray(iovecList)
+	if cap(iovecList) > cap(w.iovecList) {
+		w.iovecList = w.iovecList[:0]
+	}
 	if innerErr != nil {
 		err = innerErr
 	}
-	for index := range iovecList {
-		iovecList[index] = windows.WSABuf{}
-	}
-	return err
+	return err*/
+	panic("not implemented")
 }
 
 func (w *SyscallVectorisedPacketWriter) WriteVectorisedPacket(buffers []*buf.Buffer, destination M.Socksaddr) error {
 	w.access.Lock()
 	defer w.access.Unlock()
 	defer buf.ReleaseMulti(buffers)
-	var iovecList []windows.WSABuf
-	if w.iovecList != nil {
-		iovecList = *w.iovecList
-	}
-	iovecList = iovecList[:0]
+	iovecList := w.iovecList
 	for _, buffer := range buffers {
-		iovecList = append(iovecList, windows.WSABuf{
-			Buf: &buffer.Bytes()[0],
-			Len: uint32(buffer.Len()),
-		})
+		iovecList = append(iovecList, buffer.Iovec(buffer.Len()))
 	}
-	if w.iovecList == nil {
-		w.iovecList = new([]windows.WSABuf)
-	}
-	*w.iovecList = iovecList // cache
 	var n uint32
 	var innerErr error
 	err := w.rawConn.Write(func(fd uintptr) (done bool) {
@@ -83,11 +63,14 @@ func (w *SyscallVectorisedPacketWriter) WriteVectorisedPacket(buffers []*buf.Buf
 			nil)
 		return innerErr != windows.WSAEWOULDBLOCK
 	})
+	for i := range iovecList {
+		iovecList[i] = windows.WSABuf{}
+	}
+	if cap(iovecList) > cap(w.iovecList) {
+		w.iovecList = w.iovecList[:0]
+	}
 	if innerErr != nil {
 		err = innerErr
-	}
-	for index := range iovecList {
-		iovecList[index] = windows.WSABuf{}
 	}
 	return err
 }
