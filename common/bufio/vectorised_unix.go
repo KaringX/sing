@@ -25,37 +25,41 @@ func (w *SyscallVectorisedWriter) WriteVectorised(buffers []*buf.Buffer) error {
 	defer buf.ReleaseMulti(buffers)
 	iovecList := w.iovecList
 	for _, buffer := range buffers {
+		if buffer.IsEmpty() {
+			continue
+		}
 		iovecList = append(iovecList, buffer.Iovec(buffer.Len()))
 	}
+	if len(iovecList) == 0 {
+		return os.ErrInvalid
+	} else if cap(iovecList) > cap(w.iovecList) {
+		w.iovecList = iovecList[:0]
+	}
 	var innerErr unix.Errno
+	writeIovecList := iovecList
 	err := w.rawConn.Write(func(fd uintptr) (done bool) {
 		for {
 			var r0 uintptr
 			//nolint:staticcheck
-			r0, _, innerErr = unix.RawSyscall(unix.SYS_WRITEV, fd, uintptr(unsafe.Pointer(&iovecList[0])), uintptr(len(iovecList)))
+			r0, _, innerErr = unix.RawSyscall(unix.SYS_WRITEV, fd, uintptr(unsafe.Pointer(&writeIovecList[0])), uintptr(len(writeIovecList)))
 			writeN := int(r0)
-			for writeN > 0 {
-				if buffers[0].Len() > writeN {
-					buffers[0].Advance(writeN)
-					iovecList[0] = buffers[0].Iovec(buffers[0].Len())
+			for writeN > 0 && len(writeIovecList) > 0 {
+				if int(writeIovecList[0].Len) > writeN {
+					writeIovecList[0].Base = (*byte)(unsafe.Add(unsafe.Pointer(writeIovecList[0].Base), writeN))
+					writeIovecList[0].SetLen(int(writeIovecList[0].Len) - writeN)
 					break
 				} else {
-					writeN -= buffers[0].Len()
-					buffers[0].Release()
-					buffers = buffers[1:]
-					iovecList = iovecList[1:]
+					writeN -= int(writeIovecList[0].Len)
+					writeIovecList = writeIovecList[1:]
 				}
 			}
-			if innerErr == unix.EINTR || (innerErr == 0 && len(iovecList) > 0) {
+			if innerErr == unix.EINTR || (innerErr == 0 && len(writeIovecList) > 0) {
 				continue
 			}
 			return innerErr != unix.EAGAIN
 		}
 	})
 	common.ClearArray(iovecList)
-	if cap(iovecList) > cap(w.iovecList) {
-		w.iovecList = iovecList[:0]
-	}
 	if innerErr != 0 {
 		err = os.NewSyscallError("SYS_WRITEV", innerErr)
 	}
@@ -68,9 +72,15 @@ func (w *SyscallVectorisedPacketWriter) WriteVectorisedPacket(buffers []*buf.Buf
 	defer buf.ReleaseMulti(buffers)
 	iovecList := w.iovecList
 	for _, buffer := range buffers {
+		if buffer.IsEmpty() {
+			continue
+		}
 		iovecList = append(iovecList, buffer.Iovec(buffer.Len()))
 	}
-	var innerErr error
+	if cap(iovecList) > cap(w.iovecList) {
+		w.iovecList = iovecList[:0]
+	}
+	var innerErr unix.Errno
 	err := w.rawConn.Write(func(fd uintptr) (done bool) {
 		var msg unix.Msghdr
 		name, nameLen := ToSockaddr(destination.AddrPort())
@@ -89,11 +99,8 @@ func (w *SyscallVectorisedPacketWriter) WriteVectorisedPacket(buffers []*buf.Buf
 		}
 	})
 	common.ClearArray(iovecList)
-	if cap(iovecList) > cap(w.iovecList) {
-		w.iovecList = iovecList[:0]
-	}
-	if innerErr != nil {
-		err = innerErr
+	if innerErr != 0 {
+		err = os.NewSyscallError("SYS_SENDMSG", innerErr)
 	}
 	return err
 }
