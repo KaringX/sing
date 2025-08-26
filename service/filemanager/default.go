@@ -28,7 +28,7 @@ func WithDefault(ctx context.Context, workPath string, basePath string, tempPath
 		tempPath = os.TempDir()
 	}
 	return service.ContextWith[Manager](ctx, &defaultManager{
-		workPath: workPath,
+		workPath: workPath, //karing
 		basePath: basePath,
 		tempPath: tempPath,
 		chown:    chown,
