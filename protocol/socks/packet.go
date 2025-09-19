@@ -86,7 +86,7 @@ func (c *AssociatePacketConn) ReadPacket(buffer *buf.Buffer) (destination M.Sock
 		return
 	}
 	c.remoteAddr = destination
-	return destination, nil
+	return destination.Unwrap(), nil
 }
 
 func (c *AssociatePacketConn) WritePacket(buffer *buf.Buffer, destination M.Socksaddr) error {

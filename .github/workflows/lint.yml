@@ -26,7 +26,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: ^1.25
+          go-version: ^1.23
       - name: Cache go module
         uses: actions/cache@v4
         with:
@@ -34,9 +34,6 @@ jobs:
             ~/go/pkg/mod
           key: go-${{ hashFiles('**/go.sum') }}
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v6
         with:
           version: latest
-          args: --timeout=30m
-          install-mode: binary
-          verify: false

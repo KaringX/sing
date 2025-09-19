@@ -88,9 +88,6 @@ func (b *Buffer) Extend(n int) []byte {
 
 func (b *Buffer) Advance(from int) {
 	b.start += from
-	if b.end < b.start {
-		b.end = b.start
-	}
 }
 
 func (b *Buffer) Truncate(to int) {

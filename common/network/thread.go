@@ -77,7 +77,10 @@ type LazyHeadroom interface {
 
 func CalculateFrontHeadroom(writer any) int {
 	var headroom int
-	for writer != nil {
+	for {
+		if writer == nil {
+			break
+		}
 		if lazyRoom, isLazy := writer.(LazyHeadroom); isLazy && lazyRoom.LazyHeadroom() {
 			return DefaultHeadroom
 		}
@@ -97,7 +100,10 @@ func CalculateFrontHeadroom(writer any) int {
 
 func calculateReaderFrontHeadroom(reader any) int {
 	var headroom int
-	for reader != nil {
+	for {
+		if reader == nil {
+			break
+		}
 		if lazyRoom, isLazy := reader.(LazyHeadroom); isLazy && lazyRoom.LazyHeadroom() {
 			return DefaultHeadroom
 		}
@@ -117,7 +123,10 @@ func calculateReaderFrontHeadroom(reader any) int {
 
 func CalculateRearHeadroom(writer any) int {
 	var headroom int
-	for writer != nil {
+	for {
+		if writer == nil {
+			break
+		}
 		if lazyRoom, isLazy := writer.(LazyHeadroom); isLazy && lazyRoom.LazyHeadroom() {
 			return DefaultHeadroom
 		}
@@ -159,7 +168,10 @@ func CalculateMTU(reader any, writer any) int {
 
 func calculateReaderMTU(reader any) int {
 	var mtu int
-	for reader != nil {
+	for {
+		if reader == nil {
+			break
+		}
 		if lazyRoom, isLazy := reader.(LazyHeadroom); isLazy && lazyRoom.LazyHeadroom() {
 			return 0
 		}
@@ -182,7 +194,10 @@ func calculateReaderMTU(reader any) int {
 
 func calculateWriterMTU(writer any) int {
 	var mtu int
-	for writer != nil {
+	for {
+		if writer == nil {
+			break
+		}
 		if lazyRoom, isLazy := writer.(LazyHeadroom); isLazy && lazyRoom.LazyHeadroom() {
 			return 0
 		}
