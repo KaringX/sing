@@ -74,14 +74,14 @@ func Seconds(seconds float64) string {
 	return ToString(seconds100/100, ".", seconds100%100, seconds100%10)
 }
 
-type LaterStringr struct { //karing
-	Callback func() string
+type laterStringr struct { //karing
+	callback func() string
 }
 
-func (l *LaterStringr) String() string { //karing
-	return l.Callback()
+func (l *laterStringr) String() string { //karing
+	return l.callback()
 }
 
 func MakeLaterString(callback func() string) Stringer { //karing
-	return &LaterStringr{Callback: callback}
+	return &laterStringr{callback: callback}
 }
