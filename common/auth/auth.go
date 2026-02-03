@@ -3,8 +3,8 @@ package auth
 import "github.com/sagernet/sing/common"
 
 type User struct {
-	Username string
-	Password string
+	Username string `json:"username,omitempty"` //karing
+	Password string `json:"password,omitempty"` //karing
 }
 
 type Authenticator struct {
