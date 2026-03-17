@@ -7,11 +7,13 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"time"
 
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/auth"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
+	"github.com/sagernet/sing/common/canceler"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
@@ -126,6 +128,7 @@ func HandleConnectionEx(
 	authenticator *auth.Authenticator,
 	handler HandlerEx,
 	packetListener PacketListener,
+	udpTimeout time.Duration,
 	// resolver TorResolver,
 	source M.Socksaddr,
 	onClose N.CloseHandlerFunc,
@@ -245,11 +248,20 @@ func HandleConnectionEx(
 				return E.Cause(err, "socks5: write response")
 			}
 			var socksPacketConn N.PacketConn = NewAssociatePacketConn(bufio.NewServerPacketConn(udpConn), M.Socksaddr{}, conn)
+			if udpTimeout > 0 {
+				udpConn.SetReadDeadline(time.Now().Add(udpTimeout))
+			}
 			firstPacket := buf.NewPacket()
 			var destination M.Socksaddr
 			destination, err = socksPacketConn.ReadPacket(firstPacket)
 			if err != nil {
 				return E.Cause(err, "socks5: read first packet")
+			}
+			if udpTimeout > 0 {
+				udpConn.SetReadDeadline(time.Time{})
+			}
+			if udpTimeout > 0 {
+				ctx, socksPacketConn = canceler.NewPacketConn(ctx, socksPacketConn, udpTimeout)
 			}
 			socksPacketConn = bufio.NewCachedPacketConn(socksPacketConn, firstPacket, destination)
 			handler.NewPacketConnectionEx(ctx, socksPacketConn, source, destination, onClose)
