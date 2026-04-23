@@ -7,6 +7,7 @@ import (
 type Registry interface {
 	Register(serviceType any, service any) any
 	Get(serviceType any) any
+	Clone() Registry
 	UnRegister(serviceType any) //karing
 	UnRegisterAll()             //karing
 }
@@ -34,6 +35,18 @@ func (r *defaultRegistry) Get(serviceType any) any {
 	r.access.RLock()
 	defer r.access.RUnlock()
 	return r.serviceTypes[serviceType]
+}
+
+func (r *defaultRegistry) Clone() Registry {
+	r.access.RLock()
+	defer r.access.RUnlock()
+	serviceTypes := make(map[any]any, len(r.serviceTypes))
+	for serviceType, service := range r.serviceTypes {
+		serviceTypes[serviceType] = service
+	}
+	return &defaultRegistry{
+		serviceTypes: serviceTypes,
+	}
 }
 
 func (r *defaultRegistry) UnRegister(serviceType any) { //karing
