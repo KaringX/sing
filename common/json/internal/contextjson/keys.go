@@ -1,10 +1,6 @@
 package json
 
-import (
-	"reflect"
-
-	"github.com/sagernet/sing/common"
-)
+import "reflect"
 
 func ObjectKeys(object reflect.Type) []string {
 	switch object.Kind() {
@@ -14,7 +10,10 @@ func ObjectKeys(object reflect.Type) []string {
 	default:
 		panic("invalid non-struct input")
 	}
-	return common.Map(cachedTypeFields(object).list, func(field field) string {
-		return field.name
-	})
+	fields := cachedTypeFields(object).list
+	keys := make([]string, len(fields))
+	for i, field := range fields {
+		keys[i] = field.name
+	}
+	return keys
 }
