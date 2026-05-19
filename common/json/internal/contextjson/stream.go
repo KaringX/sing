@@ -37,8 +37,8 @@ func NewDecoderContext(ctx context.Context, r io.Reader) *Decoder {
 	return &Decoder{r: r, d: decodeState{ctx: ctx}}
 }
 
-// UseNumber causes the Decoder to unmarshal a number into an interface{} as a
-// Number instead of as a float64.
+// UseNumber causes the Decoder to unmarshal a number into an
+// interface value as a [Number] instead of as a float64.
 func (dec *Decoder) UseNumber() { dec.d.useNumber = true }
 
 // DisallowUnknownFields causes the Decoder to return an error when the destination
@@ -49,7 +49,7 @@ func (dec *Decoder) DisallowUnknownFields() { dec.d.disallowUnknownFields = true
 // Decode reads the next JSON-encoded value from its
 // input and stores it in the value pointed to by v.
 //
-// See the documentation for Unmarshal for details about
+// See the documentation for [Unmarshal] for details about
 // the conversion of JSON into a Go value.
 func (dec *Decoder) Decode(v any) error {
 	if dec.err != nil {
@@ -69,7 +69,12 @@ func (dec *Decoder) Decode(v any) error {
 	if err != nil {
 		return err
 	}
-	dec.d.init(dec.buf[dec.scanp : dec.scanp+n])
+	data, comments, err := stripJSONComments(dec.buf[dec.scanp : dec.scanp+n])
+	if err != nil {
+		return err
+	}
+	dec.d.init(data)
+	dec.d.comments = comments
 	dec.scanp += n
 
 	// Don't save err from unmarshal into dec.err:
@@ -84,7 +89,7 @@ func (dec *Decoder) Decode(v any) error {
 }
 
 // Buffered returns a reader of the data remaining in the Decoder's
-// buffer. The reader is valid until the next call to Decode.
+// buffer. The reader is valid until the next call to [Decoder.Decode].
 func (dec *Decoder) Buffered() io.Reader {
 	return bytes.NewReader(dec.buf[dec.scanp:])
 }
@@ -158,10 +163,6 @@ func (dec *Decoder) refill() error {
 		dec.scanp = 0
 	}
 
-	return dec.refill0()
-}
-
-func (dec *Decoder) refill0() error {
 	// Grow buffer if not large enough.
 	const minRead = 512
 	if cap(dec.buf)-len(dec.buf) < minRead {
@@ -208,9 +209,10 @@ func NewEncoderContext(ctx context.Context, w io.Writer) *Encoder {
 }
 
 // Encode writes the JSON encoding of v to the stream,
+// with insignificant space characters elided,
 // followed by a newline character.
 //
-// See the documentation for Marshal for details about the
+// See the documentation for [Marshal] for details about the
 // conversion of Go values to JSON.
 func (enc *Encoder) Encode(v any) error {
 	if enc.err != nil {
@@ -267,7 +269,7 @@ func (enc *Encoder) SetEscapeHTML(on bool) {
 }
 
 // RawMessage is a raw encoded JSON value.
-// It implements Marshaler and Unmarshaler and can
+// It implements [Marshaler] and [Unmarshaler] and can
 // be used to delay JSON decoding or precompute a JSON encoding.
 type RawMessage []byte
 
@@ -288,19 +290,17 @@ func (m *RawMessage) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-var (
-	_ Marshaler   = (*RawMessage)(nil)
-	_ Unmarshaler = (*RawMessage)(nil)
-)
+var _ Marshaler = (*RawMessage)(nil)
+var _ Unmarshaler = (*RawMessage)(nil)
 
 // A Token holds a value of one of these types:
 //
-//	Delim, for the four JSON delimiters [ ] { }
-//	bool, for JSON booleans
-//	float64, for JSON numbers
-//	Number, for JSON numbers
-//	string, for JSON string literals
-//	nil, for JSON null
+//   - [Delim], for the four JSON delimiters [ ] { }
+//   - bool, for JSON booleans
+//   - float64, for JSON numbers
+//   - [Number], for JSON numbers
+//   - string, for JSON string literals
+//   - nil, for JSON null
 type Token any
 
 const (
@@ -370,14 +370,14 @@ func (d Delim) String() string {
 }
 
 // Token returns the next JSON token in the input stream.
-// At the end of the input stream, Token returns nil, io.EOF.
+// At the end of the input stream, Token returns nil, [io.EOF].
 //
 // Token guarantees that the delimiters [ ] { } it returns are
 // properly nested and matched: if Token encounters an unexpected
 // delimiter in the input, it will return an error.
 //
 // The input stream consists of basic JSON values—bool, string,
-// number, and null—along with delimiters [ ] { } of type Delim
+// number, and null—along with delimiters [ ] { } of type [Delim]
 // to mark the start and end of arrays and objects.
 // Commas and colons are elided.
 func (dec *Decoder) Token() (Token, error) {
@@ -397,7 +397,7 @@ func (dec *Decoder) Token() (Token, error) {
 			return Delim('['), nil
 
 		case ']':
-			if dec.tokenState != tokenArrayStart && dec.tokenState != tokenArrayComma {
+			if dec.tokenState != tokenArrayStart && dec.tokenState != tokenArrayComma && dec.tokenState != tokenArrayValue {
 				return dec.tokenError(c)
 			}
 			dec.scanp++
@@ -424,6 +424,7 @@ func (dec *Decoder) Token() (Token, error) {
 			dec.tokenStack = dec.tokenStack[:len(dec.tokenStack)-1]
 			dec.tokenValueEnd()
 			return Delim('}'), nil
+
 		case ':':
 			if dec.tokenState != tokenObjectColon {
 				return dec.tokenError(c)
@@ -496,7 +497,6 @@ func (dec *Decoder) tokenError(c byte) (Token, error) {
 // current array or object being parsed.
 func (dec *Decoder) More() bool {
 	c, err := dec.peek()
-	// return err == nil && c != ']' && c != '}'
 	if err != nil {
 		return false
 	}
@@ -504,10 +504,7 @@ func (dec *Decoder) More() bool {
 		return false
 	}
 	if c == ',' {
-		scanp := dec.scanp
-		dec.scanp++
-		c, err = dec.peekNoRefill()
-		dec.scanp = scanp
+		c, _, err = dec.peekFrom(dec.scanp + 1)
 		if err != nil {
 			return false
 		}
@@ -519,41 +516,83 @@ func (dec *Decoder) More() bool {
 }
 
 func (dec *Decoder) peek() (byte, error) {
+	c, scanp, err := dec.peekFrom(dec.scanp)
+	if err != nil {
+		return 0, err
+	}
+	dec.scanp = scanp
+	return c, nil
+}
+
+func (dec *Decoder) peekFrom(scanp int) (byte, int, error) {
 	var err error
 	for {
-		for i := dec.scanp; i < len(dec.buf); i++ {
-			c := dec.buf[i]
+	Buffer:
+		for scanp < len(dec.buf) {
+			c := dec.buf[scanp]
 			if isSpace(c) {
+				scanp++
 				continue
 			}
-			dec.scanp = i
-			return c, nil
+			if c == '#' {
+				next, ok := dec.skipLineCommentInBuffer(scanp + 1)
+				if !ok {
+					break
+				}
+				scanp = next
+				continue
+			}
+			if c == '/' {
+				if scanp+1 >= len(dec.buf) {
+					break Buffer
+				}
+				switch dec.buf[scanp+1] {
+				case '/':
+					next, ok := dec.skipLineCommentInBuffer(scanp + 2)
+					if !ok {
+						break Buffer
+					}
+					scanp = next
+					continue
+				case '*':
+					next, ok := dec.skipBlockCommentInBuffer(scanp + 2)
+					if !ok {
+						break Buffer
+					}
+					scanp = next
+					continue
+				}
+			}
+			return c, scanp, nil
 		}
 		// buffer has been scanned, now report any error
 		if err != nil {
-			return 0, err
+			return 0, 0, err
 		}
+		oldScanp := dec.scanp
 		err = dec.refill()
+		scanp -= oldScanp
 	}
 }
 
-func (dec *Decoder) peekNoRefill() (byte, error) {
-	var err error
-	for {
-		for i := dec.scanp; i < len(dec.buf); i++ {
-			c := dec.buf[i]
-			if isSpace(c) {
-				continue
-			}
-			dec.scanp = i
-			return c, nil
+func (dec *Decoder) skipLineCommentInBuffer(i int) (int, bool) {
+	for i < len(dec.buf) {
+		if dec.buf[i] == '\n' || dec.buf[i] == '\r' {
+			return i + 1, true
 		}
-		// buffer has been scanned, now report any error
-		if err != nil {
-			return 0, err
-		}
-		err = dec.refill0()
+		i++
 	}
+	return i, false
+}
+
+func (dec *Decoder) skipBlockCommentInBuffer(i int) (int, bool) {
+	for i+1 < len(dec.buf) {
+		if dec.buf[i] == '*' && dec.buf[i+1] == '/' {
+			return i + 2, true
+		}
+		i++
+	}
+	return i, false
 }
 
 // InputOffset returns the input stream byte offset of the current decoder position.

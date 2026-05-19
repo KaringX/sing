@@ -4,33 +4,26 @@ run:
 linters:
   default: none
   enable:
-    - govet
     - ineffassign
     - paralleltest
     - staticcheck
+    - unused
+    - modernize
   settings:
     staticcheck:
       checks:
         - all
-        - -S1000
-        - -S1008
-        - -S1017
-        - -ST1001
-        - -ST1003
-        - -QF1001
-        - -QF1003
-        - -QF1008
+        - -QF1008 # could remove embedded field "<interface>" from selector
+        - -ST1003 # should not use ALL_CAPS in Go names; use CamelCase instead
+        - -QF1001 # could apply De Morgan's law
   exclusions:
     generated: lax
     presets:
       - comments
       - common-false-positives
-      - legacy
-      - std-error-handling
     paths:
-      - third_party$
-      - builtin$
-      - examples$
+      - common/json/internal/contextjson
+      - contrab
 formatters:
   enable:
     - gci
@@ -45,6 +38,4 @@ formatters:
   exclusions:
     generated: lax
     paths:
-      - third_party$
-      - builtin$
-      - examples$
+      - common/json/internal/contextjson

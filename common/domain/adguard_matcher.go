@@ -42,9 +42,7 @@ func NewAdGuardMatcher(ruleLines []string) *AdGuardMatcher {
 			ruleLine = string(prefixLabel) + ruleLine
 		}
 		if !hasEnd {
-			if strings.HasSuffix(ruleLine, ".") {
-				ruleLine = ruleLine[:len(ruleLine)-1]
-			}
+			ruleLine = strings.TrimSuffix(ruleLine, ".")
 			ruleLine += string(suffixLabel)
 		}
 		ruleList = append(ruleList, reverseDomain(ruleLine))
@@ -94,7 +92,7 @@ func (m *AdGuardMatcher) hasWithDepth(key []byte, nodeId, bmIdx int, depth int) 
 	}
 
 	keyLen := len(key)
-	for i := 0; i < keyLen; i++ {
+	for i := range keyLen {
 		currentChar := key[i]
 		for ; ; bmIdx++ {
 			if getBit(m.set.labelBitmap, bmIdx) != 0 {
@@ -159,12 +157,13 @@ func (m *AdGuardMatcher) Dump() (ruleLines []string) {
 			hasStart bool
 			hasEnd   bool
 		)
-		if key[0] == prefixLabel {
+		switch key[0] {
+		case prefixLabel:
 			key = key[1:]
-		} else if key[0] == rootLabel {
+		case rootLabel:
 			key = key[1:]
 			isSuffix = true
-		} else {
+		default:
 			hasStart = true
 		}
 		if key[len(key)-1] == suffixLabel {

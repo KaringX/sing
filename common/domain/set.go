@@ -215,7 +215,7 @@ func indexRank64(words []uint64, opts ...bool) []int32 {
 	}
 	idx := make([]int32, l)
 	n := int32(0)
-	for i := 0; i < len(words); i++ {
+	for i := range len(words) {
 		idx[i] = n
 		n += int32(bits.OnesCount64(words[i]))
 	}
@@ -274,7 +274,7 @@ func indexSelect32R64(words []uint64) ([]int32, []int32) {
 	sidx := make([]int32, 0, len(words))
 
 	ith := -1
-	for i := 0; i < l; i++ {
+	for i := range l {
 		if words[i>>6]&(1<<uint(i&63)) != 0 {
 			ith++
 			if ith&31 == 0 {
@@ -299,12 +299,12 @@ var (
 )
 
 func initMasks() {
-	for i := 0; i < 65; i++ {
+	for i := range 65 {
 		mask[i] = (1 << uint(i)) - 1
 	}
 
 	var maskUpto [64]uint64
-	for i := 0; i < 64; i++ {
+	for i := range 64 {
 		maskUpto[i] = (1 << uint(i+1)) - 1
 		rMaskUpto[i] = ^maskUpto[i]
 	}
@@ -313,9 +313,9 @@ func initMasks() {
 var select8Lookup [256 * 8]uint8
 
 func initSelectLookup() {
-	for i := 0; i < 256; i++ {
+	for i := range 256 {
 		w := uint8(i)
-		for j := 0; j < 8; j++ {
+		for j := range 8 {
 			// x-th 1 in w
 			// if x-th 1 is not found, it is 8
 			x := bits.TrailingZeros8(w)
