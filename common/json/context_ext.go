@@ -12,7 +12,7 @@ var (
 	NewEncoderContext                     = json.NewEncoderContext
 	NewDecoderContext                     = json.NewDecoderContext
 	UnmarshalContextDisallowUnknownFields = json.UnmarshalContextDisallowUnknownFields
-	UnmarshalContextAllowUnknownFields    = json.UnmarshalContextAllowUnknownFields
+	UnmarshalContextAllowUnknownFields    = json.UnmarshalContextAllowUnknownFields //karing
 )
 
 type ContextMarshaler interface {
