@@ -266,7 +266,7 @@ func CopyPacket(destinationConn N.PacketWriter, source N.PacketReader) (n int64,
 		destinationConn, writeCounters = N.UnwrapCountPacketWriter(destinationConn, writeCounters)
 		if cachedReader, isCached := source.(N.CachedPacketReader); isCached {
 			packet := cachedReader.ReadCachedPacket()
-			if packet != nil && packet.Buffer != nil { //karing
+			if packet != nil {
 				var cachedN int64
 				cachedN, err = writePacketWithPool(originSource, destinationConn, []*N.PacketBuffer{packet}, readCounters, writeCounters, n > 0)
 				n += cachedN

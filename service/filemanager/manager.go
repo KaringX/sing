@@ -10,7 +10,6 @@ import (
 )
 
 type Manager interface {
-	WorkPath(name string) string //karing
 	BasePath(name string) string
 	TempPath() string
 	OpenFile(name string, flag int, perm os.FileMode) (*os.File, error)
@@ -22,14 +21,6 @@ type Manager interface {
 	Remove(path string) error
 	RemoveAll(path string) error
 	Rename(oldPath string, newPath string) error
-}
-
-func WorkPath(ctx context.Context, name string) string { //karing
-	manager := service.FromContext[Manager](ctx)
-	if manager == nil {
-		return name
-	}
-	return manager.WorkPath(name)
 }
 
 func BasePath(ctx context.Context, name string) string {

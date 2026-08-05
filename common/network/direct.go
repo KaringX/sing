@@ -17,6 +17,7 @@ type ReadWaitOptions struct {
 	FrontHeadroom  int
 	RearHeadroom   int
 	MTU            int
+	ReadOverhead   int
 	IncreaseBuffer bool
 	BatchSize      int
 }
@@ -26,6 +27,7 @@ func NewReadWaitOptions(source any, destination any) ReadWaitOptions {
 		FrontHeadroom: CalculateFrontHeadroom(destination),
 		RearHeadroom:  CalculateRearHeadroom(destination),
 		MTU:           CalculateMTU(source, destination),
+		ReadOverhead:  CalculateReaderOverhead(source),
 	}
 }
 
@@ -52,7 +54,7 @@ func (o ReadWaitOptions) NewBuffer() *buf.Buffer {
 	bufferSize := buf.BufferSize
 	if o.IncreaseBuffer {
 		if o.MTU > 0 {
-			bufferSize = o.MTU + o.FrontHeadroom + o.RearHeadroom
+			bufferSize = o.MTU + o.ReadOverhead + o.FrontHeadroom + o.RearHeadroom
 		} else {
 			bufferSize = 65535
 		}
@@ -60,7 +62,7 @@ func (o ReadWaitOptions) NewBuffer() *buf.Buffer {
 			bufferSize = buf.MaxPooledBufferSize
 		}
 	} else if o.MTU > 0 {
-		mtuBufferSize := o.MTU + o.FrontHeadroom + o.RearHeadroom
+		mtuBufferSize := o.MTU + o.ReadOverhead + o.FrontHeadroom + o.RearHeadroom
 		if mtuBufferSize < bufferSize {
 			bufferSize = mtuBufferSize
 		}
@@ -82,7 +84,7 @@ func (o ReadWaitOptions) NewBuffer() *buf.Buffer {
 func (o ReadWaitOptions) NewPacketBuffer() *buf.Buffer {
 	bufferSize := buf.UDPBufferSize
 	if o.MTU > 0 {
-		bufferSize = o.MTU + o.FrontHeadroom + o.RearHeadroom
+		bufferSize = o.MTU + o.ReadOverhead + o.FrontHeadroom + o.RearHeadroom
 	}
 	minimumBufferSize := o.FrontHeadroom + o.RearHeadroom + 1
 	if bufferSize < minimumBufferSize {

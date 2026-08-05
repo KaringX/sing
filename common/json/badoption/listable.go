@@ -19,14 +19,14 @@ func (l Listable[T]) MarshalJSONContext(ctx context.Context) ([]byte, error) {
 
 func (l *Listable[T]) UnmarshalJSONContext(ctx context.Context, content []byte) error {
 	var singleItem *T
-	err := json.UnmarshalContextAllowUnknownFields(ctx, content, &singleItem) //karing
+	err := json.UnmarshalContextDisallowUnknownFields(ctx, content, &singleItem)
 	if err == nil {
 		if singleItem != nil {
 			*l = []T{*singleItem}
 		}
 		return nil
 	}
-	newErr := json.UnmarshalContextAllowUnknownFields(ctx, content, (*[]T)(l)) //karing
+	newErr := json.UnmarshalContextDisallowUnknownFields(ctx, content, (*[]T)(l))
 	if newErr == nil {
 		return nil
 	}

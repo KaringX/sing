@@ -57,8 +57,6 @@ func ToString(messages ...any) string {
 			output.WriteString(message.Error())
 		case Stringer:
 			output.WriteString(message.String())
-		case []uint8: //karing
-			output.WriteString(string(message))
 		default:
 			panic("unknown value")
 		}

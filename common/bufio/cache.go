@@ -42,10 +42,8 @@ func (c *CachedConn) Read(p []byte) (n int, err error) {
 		if err == nil {
 			return
 		}
-		if buffer := c.buffer; buffer != nil { //karing
-			buffer.DecRef()
-			buffer.Release()
-		}
+		c.buffer.DecRef()
+		c.buffer.Release()
 		c.buffer = nil
 	}
 	return c.Conn.Read(p)
@@ -186,10 +184,8 @@ func (c *CachedPacketConn) ReadPacket(buffer *buf.Buffer) (destination M.Socksad
 		if err != nil {
 			return M.Socksaddr{}, err
 		}
-		if buffer := c.buffer; buffer != nil { //karing
-			buffer.DecRef()
-			buffer.Release()
-		}
+		c.buffer.DecRef()
+		c.buffer.Release()
 		c.buffer = nil
 		return c.destination, nil
 	}

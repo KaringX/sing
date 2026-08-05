@@ -3,7 +3,7 @@ package json
 import (
 	"context"
 
-	json "github.com/sagernet/sing/common/json/internal/contextjson"
+	"github.com/sagernet/sing/common/json/internal/contextjson"
 )
 
 var (
@@ -12,7 +12,6 @@ var (
 	NewEncoderContext                     = json.NewEncoderContext
 	NewDecoderContext                     = json.NewDecoderContext
 	UnmarshalContextDisallowUnknownFields = json.UnmarshalContextDisallowUnknownFields
-	UnmarshalContextAllowUnknownFields    = json.UnmarshalContextAllowUnknownFields //karing
 )
 
 type ContextMarshaler interface {

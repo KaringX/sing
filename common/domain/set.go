@@ -170,11 +170,10 @@ func writeByteSlice(writer varbin.Writer, value []byte) error {
 }
 
 func setBit(bm *[]uint64, i int, v int) {
-	index := i >> 6         //karing
-	for index >= len(*bm) { //karing
+	for i>>6 >= len(*bm) {
 		*bm = append(*bm, 0)
 	}
-	(*bm)[index] |= uint64(v) << uint(i&63) //karing
+	(*bm)[i>>6] |= uint64(v) << uint(i&63)
 }
 
 func getBit(bm []uint64, i int) uint64 {

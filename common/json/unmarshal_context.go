@@ -5,4 +5,3 @@ import (
 )
 
 var UnmarshalDisallowUnknownFields = json.UnmarshalDisallowUnknownFields
-var UnmarshalAllowUnknownFields = json.UnmarshalAllowUnknownFields //karing

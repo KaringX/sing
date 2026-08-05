@@ -51,7 +51,7 @@ func UnmarshallExcludedContext(ctx context.Context, inputContent []byte, parentO
 	if err != nil {
 		return err
 	}
-	return json.UnmarshalContextAllowUnknownFields(ctx, inputContent, object) //karing
+	return json.UnmarshalContextDisallowUnknownFields(ctx, inputContent, object)
 }
 
 func UnmarshallExcludedMulti(inputContent []byte, parentObject any, object any) error {
