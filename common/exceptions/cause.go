@@ -5,15 +5,7 @@ type causeError struct {
 	cause   error
 }
 
-func (e *causeError) Error() (str string) {
-	defer func() { //karing
-		if err := recover(); err != nil {
-			str = e.message + ": recover from panic"
-		}
-	}()
-	if e.cause == nil { //karing
-		return e.message
-	}
+func (e *causeError) Error() string {
 	return e.message + ": " + e.cause.Error()
 }
 
