@@ -38,14 +38,14 @@ func WithDefault(ctx context.Context, workPath string, basePath string, tempPath
 }
 
 func (m *defaultManager) WorkPath(name string) string { //karing
-	if m.workPath == "" || strings.HasPrefix(name, "/") {
+	if m.workPath == "" || strings.HasPrefix(name, "/") || filepath.IsAbs(name) {
 		return name
 	}
 	return filepath.Join(m.workPath, name)
 }
 
 func (m *defaultManager) BasePath(name string) string {
-	if m.basePath == "" || strings.HasPrefix(name, "/") {
+	if m.basePath == "" || strings.HasPrefix(name, "/") || filepath.IsAbs(name) { //karing
 		return name
 	}
 	return filepath.Join(m.basePath, name)
