@@ -247,7 +247,8 @@ func HandleConnectionEx(
 			if err != nil {
 				return E.Cause(err, "socks5: write response")
 			}
-			associateConn := NewAssociatePacketConn(bufio.NewServerPacketConn(udpConn), M.Socksaddr{}, conn)
+			serverConn := bufio.NewServerPacketConn(udpConn)
+			associateConn := NewAssociatePacketConn(serverConn, M.Socksaddr{}, conn)
 			go func() {
 				var buffer [1]byte
 				_, _ = conn.Read(buffer[:])
@@ -257,10 +258,18 @@ func HandleConnectionEx(
 			if udpTimeout > 0 {
 				udpConn.SetReadDeadline(time.Now().Add(udpTimeout))
 			}
-			firstPacket := buf.NewPacket()
+			var firstPacket *buf.Buffer
 			var destination M.Socksaddr
-			destination, err = socksPacketConn.ReadPacket(firstPacket)
+			readWaiter, hasReadWaiter := bufio.CreatePacketReadWaiter(socksPacketConn)
+			if hasReadWaiter {
+				readWaiter.InitializeReadWaiter(N.ReadWaitOptions{})
+				firstPacket, destination, err = readWaiter.WaitReadPacket()
+			} else {
+				firstPacket = buf.NewPacket()
+				destination, err = socksPacketConn.ReadPacket(firstPacket)
+			}
 			if err != nil {
+				firstPacket.Release()
 				_ = socksPacketConn.Close()
 				return E.Cause(err, "socks5: read first packet")
 			}
@@ -271,7 +280,7 @@ func HandleConnectionEx(
 				ctx, socksPacketConn = canceler.NewPacketConn(ctx, socksPacketConn, udpTimeout)
 			}
 			socksPacketConn = bufio.NewCachedPacketConn(socksPacketConn, firstPacket, destination)
-			handler.NewPacketConnectionEx(ctx, socksPacketConn, source, destination, onClose)
+			handler.NewPacketConnectionEx(ctx, socksPacketConn, M.SocksaddrFromNet(serverConn.RemoteAddr()).Unwrap(), destination, onClose)
 			return nil
 		/*case CommandTorResolve, CommandTorResolvePTR:
 		if resolver == nil {
